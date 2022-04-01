@@ -224,12 +224,22 @@ label_no_fig = {
 # dbc select: KPI map
 dd_kpi_map = dbc.Select(id="my-map-dd", options=[], value="",)
 
+# hard-coded columns: presence of officials
+col_officials = ["MOIC_pres", "MO_pres", "BHM_pres", "BCM_pres", "CCM_pres"]
+
 # hard-coded options for map
-kpi_map = {
-    "Sess_plan": "Total number of planned sessions",
-    "Sess_with_vacc": "Total number of sessions where vaccine distribution was done by 8.00 am",
-}
-map_options = [{"label": v, "value": k} for k, v in kpi_map.items()]
+kpi_map_value = ["Sess_plan", "Sess_with_vacc", "Sess_with_vacc_ratio", *col_officials]
+kpi_map_label = [
+    "Total number of planned sessions",
+    "Total number of sessions where the vaccine distribution was done by 8.00 am",
+    "Proportion of sessions where the vaccine distribution was done by 8.00 am [%]",
+    "Proportion of sessions with presence of MOIC officials during the vaccine distribution [%]",
+    "Proportion of sessions with presence of MO officials during the vaccine distribution [%]",
+    "Proportion of sessions with presence of BHM officials during the vaccine distribution [%]",
+    "Proportion of sessions with presence of BCM officials during the vaccine distribution [%]",
+    "Proportion of sessions with presence of CCM officials during the vaccine distribution [%]",
+]
+map_options = [{"label": l, "value": v} for l, v in zip(kpi_map_label, kpi_map_value)]
 
 # dbc map/maps row
 map_row = dbc.Container(
@@ -242,7 +252,7 @@ map_row = dbc.Container(
                             html.P(
                                 "Key Performance Indicators: District-wise map",
                                 style={
-                                    "fontWeight": "normal",  # 'bold', #
+                                    "fontWeight": "bold",  # 'normal', #
                                     "textAlign": "left",  # 'center', #
                                     # 'paddingTop': '25px',
                                     "color": "DeepSkyBlue",
@@ -261,11 +271,7 @@ map_row = dbc.Container(
             style={"paddingLeft": "25px", "marginBottom": "30px",},
         ),
         dbc.Row(
-            [
-                dbc.Col(
-                    dcc.Graph(id="district-plot", figure=label_no_fig), width="auto"
-                ),
-            ],
+            [dbc.Col(dcc.Graph(id="district-plot", figure=label_no_fig), width=7),],
             justify="evenly",
             align="start",
         ),
@@ -273,32 +279,118 @@ map_row = dbc.Container(
     fluid=True,
 )
 
-# # dbc map/maps row
-# map_row = dbc.Container(
-#     dbc.Row(
-#         [
-#             dbc.Col(
-#                 html.Div([
-#                     html.H6(
-#                         "District-wise Key Performance Indicators",
-#                         style={
-#                             'fontWeight': 'normal', # 'bold', #
-#                             'textAlign': 'left', # 'center', #
-#                             # 'paddingTop': '25px',
-#                             'color': 'DeepSkyBlue',
-#                             'fontSize': '14px',
-#                         },
-#                     ),
-#                     dcc.Graph(id='district-plot'),
-#                 ]),
-#                 width="auto"
-#             ),
-#         ],
-#     justify="evenly",
-#     align="start",
-#     ),
-#     fluid=True
+
+# In[ ]:
+
+
+# # dbc select: trends
+# dd_kpi_trends = dbc.Select(
+#     id="my-trends-dd",
+#     options=[],
+#     value="",
 # )
+
+# dcc dropdown: trends --> dcc allows multi, styling not as dbc
+dd_kpi_trends = dcc.Dropdown(id="my-trends-dd", options=[], value="", multi=True,)
+
+# hard-coded options for trends
+kpi_with_trend_value = ["Sess_plan", "Sess_with_vacc", *col_officials]
+kpi_with_trend_label = [
+    "Trend in the total number of planned sessions",
+    "Trend in the total number of sessions where the vaccine distribution was done by 8.00 am",
+    "Trend in the presence of MOIC officials during the vaccine distribution",
+    "Trend in the presence of MO officials during the vaccine distribution",
+    "Trend in the presence of BHM officials during the vaccine distribution",
+    "Trend in the presence of BCM officials during the vaccine distribution",
+    "Trend in the presence of CCM officials during the vaccine distribution",
+]
+trend_options = [
+    {"label": l, "value": v} for l, v in zip(kpi_with_trend_label, kpi_with_trend_value)
+]
+
+# # dbc select: districts
+# dd_districts = dbc.Select(
+#     id="my-districts-dd",
+#     options=[],
+#     value="",
+# )
+
+# dcc dropdown: districts --> dcc allows multi, styling not as dbc
+dd_districts = dcc.Dropdown(id="my-districts-dd", options=[], value="", multi=True,)
+
+# hard-coded options for districts
+district_options = [{"label": k, "value": k} for k in data_2_map_district]
+
+# dbc ButtonGroup with RadioItems
+button_group = html.Div(
+    [
+        dbc.RadioItems(
+            id="radios",
+            className="btn-group",
+            inputClassName="btn-check",
+            labelClassName="btn btn-outline-info",
+            labelCheckedClassName="active",
+            options=[
+                {"label": "Monthly", "value": "M"},
+                {"label": "Weekly", "value": "W"},
+                {"label": "Daily", "value": "D"},
+            ],
+            value="D",
+        ),
+    ],
+    className="radio-group",
+)
+
+# dbc trends row
+trends_row = dbc.Container(
+    [
+        dbc.Row(
+            [
+                dbc.Col(
+                    html.Div(
+                        [
+                            html.P(
+                                "Key Performance Indicators: District-wise trends",
+                                style={
+                                    "fontWeight": "bold",  # 'normal', #
+                                    "textAlign": "left",  # 'center', #
+                                    # 'paddingTop': '25px',
+                                    "color": "DeepSkyBlue",
+                                    "fontSize": "18px",
+                                    "marginBottom": "10px",
+                                },
+                            ),
+                            dd_kpi_trends,
+                        ],
+                        style={"font-size": "85%"},
+                    ),
+                    width={"size": 5},  # width="auto",
+                ),
+                dbc.Col(
+                    html.Div(
+                        [dd_districts], style={"font-size": "85%"}
+                    ),  # , className="dash-bootstrap"
+                    width={"size": 4, "offset": 1},
+                ),
+            ],
+            justify="start",
+            align="end",
+            style={"paddingLeft": "25px", "marginBottom": "30px",},
+        ),
+        dbc.Row(
+            [dbc.Col(button_group, width="auto"),],
+            justify="start",
+            align="start",
+            style={"paddingLeft": "25px"},
+        ),
+        dbc.Row(
+            [dbc.Col(dcc.Graph(id="trends-plot", figure=label_no_fig), width=7),],
+            justify="evenly",
+            align="start",
+        ),
+    ],
+    fluid=True,  # className="dash-bootstrap"
+)
 
 
 # In[ ]:
@@ -307,6 +399,7 @@ map_row = dbc.Container(
 # external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 fontawesome_stylesheet = "https://use.fontawesome.com/releases/v5.8.1/css/all.css"
 # Build App
+# app = JupyterDash(__name__)
 # app = JupyterDash(__name__, external_stylesheets=external_stylesheets)
 app = Dash(
     __name__, external_stylesheets=[dbc.themes.BOOTSTRAP, fontawesome_stylesheet]
@@ -374,13 +467,23 @@ app.layout = html.Div(
                 "margin-bottom": "0",
             }
         ),
-        # div map row (add loading)
+        # div map row
         dcc.Loading(
             children=html.Div([map_row], style={"paddingTop": "20px",},),
             id="loading-map",
             type="circle",
             fullscreen=True,
         ),
+        html.Hr(
+            style={
+                "color": "DeepSkyBlue",
+                "height": "3px",
+                "margin-top": "30px",
+                "margin-bottom": "0",
+            }
+        ),
+        # div trends row (no loading added)
+        html.Div([trends_row], style={"paddingTop": "20px",},),
         # dbc Modal: output msg from load button - wraped by Spinner
         dcc.Loading(
             children=dbc.Modal(
@@ -412,6 +515,8 @@ app.layout = html.Div(
         html.Div(id="df-district-kpis", style={"display": "none"}),
         # hidden div: share calculated kpis for blocks
         html.Div(id="df-block-kpis", style={"display": "none"}),
+        # hidden div: share calculated kpis for trends (districts)
+        html.Div(id="df-trends-kpis", style={"display": "none"}),
     ]
 )
 
@@ -456,16 +561,45 @@ def read_csv_file(contents, filename, date):
             f"There was an error processing {filename}",
             {},
         )
+        
+    # simple validation: col_2_check must be in dataframe
+    col_2_check = [
+        "Date",
+        "S_Num",
+        "District",
+        "Block",
+        "Sess_plan",
+        "Sess_with_vacc",
+        "Notes",
+    ]
+    col_2_check.extend(col_officials)
+    col_check = [col in vacc_dist_df.columns for col in col_2_check]
+    # missing columns
+    miss_col = [i for (i, v) in zip(col_2_check, col_check) if not v]
 
     # return ingestion message and read csv
     return (
-        [
-            f"Uploaded File is {filename}",
-            html.Br(),
-            f"Last modified datetime is {datetime.fromtimestamp(date)}",
-        ],
-        # csv to json: sharing data within Dash
-        vacc_dist_df.to_json(orient="split"),
+        (
+            [
+                f"Uploaded File is {filename}",
+                html.Br(),
+                f"Last modified datetime is {datetime.fromtimestamp(date)}",
+            ],
+            # csv to json: sharing data within Dash
+            vacc_dist_df.to_json(orient="split"),
+        )
+        if all(col_check)
+        else (
+            [
+                f"Uploaded File is {filename}",
+                html.Br(),
+                f"Last modified datetime is {datetime.fromtimestamp(date)}",
+                html.Br(),
+                f"KPIs not calculated. Missing columns: {miss_col}",
+            ],
+            # no dataframe return
+            {},
+        )
     )
 
 
@@ -534,23 +668,109 @@ def district_calc(df, ini_date, end_date):
 
     # no entry between dates: return empty
     if df_in_dates.empty:
-        return "N/A", "N/A", {}, {}, [], ""
+        return "N/A", "N/A", {}, {}, [], "", [], "", [], "", {}
 
-    # kpi: TOP District/Blocks sessions and vacc distribution
+    # kpi: District/Blocks sessions and vacc distribution - Count rows in Notes
     top_block_df = (
-        df_in_dates.groupby(["District", "Block"], as_index=False, sort=False)
-        .agg({"Sess_plan": "sum", "Sess_with_vacc": "sum"})
+        df_in_dates.groupby(["District", "Block"], sort=False)
+        .agg({"Sess_plan": "sum", "Sess_with_vacc": "sum", "Notes": "size"})
         .astype({"Sess_plan": "int64", "Sess_with_vacc": "int64"})
-        .sort_values("Sess_with_vacc", ascending=False)
-        .reset_index(drop=True)
     )
     top_distr_df = (
-        df_in_dates.groupby("District", as_index=False, sort=False)
-        .agg({"Sess_plan": "sum", "Sess_with_vacc": "sum"})
+        df_in_dates.groupby("District", sort=False)
+        .agg({"Sess_plan": "sum", "Sess_with_vacc": "sum", "Notes": "size"})
         .astype({"Sess_plan": "int64", "Sess_with_vacc": "int64"})
-        .sort_values("Sess_with_vacc", ascending=False)
-        .reset_index(drop=True)
     )
+
+    # kpi: District/Blocks % sessions with vacc distribution
+    top_block_df["Sess_with_vacc_ratio"] = round(
+        top_block_df.Sess_with_vacc / top_block_df.Sess_plan * 100
+    )
+    top_distr_df["Sess_with_vacc_ratio"] = round(
+        top_distr_df.Sess_with_vacc / top_distr_df.Sess_plan * 100
+    )
+
+    # kpi: District/Blocks % sessions with presence of officials
+    for off_col in col_officials:
+        is_present = df_in_dates[off_col].str.contains(
+            "y", case=False, regex=False, na=False
+        )
+        top_block_df[off_col] = round(
+            df_in_dates[is_present]
+            .groupby(["District", "Block"], sort=False)
+            .agg({"Notes": "size"})
+            .Notes
+            / top_block_df.Notes
+            * 100
+        )
+        top_distr_df[off_col] = round(
+            df_in_dates[is_present]
+            .groupby("District", sort=False)
+            .agg({"Notes": "size"})
+            .Notes
+            / top_distr_df.Notes
+            * 100
+        )
+        # normalize presence of officials
+        df_in_dates.loc[is_present, off_col] = "YES"
+        df_in_dates.loc[~is_present, off_col] = "NO"
+
+    # sort values for kpi TOP District/Blocks
+    top_block_df.reset_index(inplace=True)
+    top_block_df.sort_values(
+        "Sess_with_vacc", ascending=False, ignore_index=True, inplace=True,
+    )
+    top_distr_df.reset_index(inplace=True)
+    top_distr_df.sort_values(
+        "Sess_with_vacc", ascending=False, ignore_index=True, inplace=True,
+    )
+
+    # kpi: District sessions and vacc distribution - Time-series: df_in_dates refactor
+    # drop not relevant columns
+    df_in_dates.drop(columns=["S_Num", "Block", "Notes"], inplace=True)
+    # transform presence of officials to numeric
+    df_in_dates.replace({"YES": 1, "NO": 0}, inplace=True, regex=False)
+
+    # daily aggregate by district and melt kpis (wide-to-long transform)
+    distr_daily_df = (
+        (
+            df_in_dates.groupby(["Date", "District"], sort=False)
+            .agg("sum")
+            .astype("int64")
+        )
+        .reset_index()
+        .melt(id_vars=["Date", "District"], value_vars=kpi_with_trend_value,)
+    )
+    # assign 'daily' to new column: time frequency
+    distr_daily_df["Freq"] = "D"
+
+    # weekly aggregate by district and melt kpis (wide-to-long transform)
+    distr_weekly_df = (
+        (
+            df_in_dates.set_index("Date")
+            .groupby([pd.Grouper(freq="W"), "District"], sort=False)
+            .agg("sum")
+            .astype("int64")
+        )
+        .reset_index()
+        .melt(id_vars=["Date", "District"], value_vars=kpi_with_trend_value,)
+    )
+    # assign 'weekly' to new column: time frequency
+    distr_weekly_df["Freq"] = "W"
+
+    # monthly aggregate by district and melt kpis (wide-to-long transform)
+    distr_monthly_df = (
+        (
+            df_in_dates.set_index("Date")
+            .groupby([pd.Grouper(freq="M"), "District"], sort=False)
+            .agg("sum")
+            .astype("int64")
+        )
+        .reset_index()
+        .melt(id_vars=["Date", "District"], value_vars=kpi_with_trend_value,)
+    )
+    # assign 'monthly' to new column: time frequency
+    distr_monthly_df["Freq"] = "M"
 
     # return kpis calculated and dropdown options
     return (
@@ -580,6 +800,14 @@ def district_calc(df, ini_date, end_date):
         top_block_df.to_json(orient="split"),
         map_options,
         "Sess_plan",
+        trend_options,
+        "Sess_plan",
+        district_options,
+        "ARARIA",
+        # csv to json: sharing data within Dash
+        pd.concat(
+            [distr_daily_df, distr_weekly_df, distr_monthly_df], ignore_index=True
+        ).to_json(orient="split"),
     )
 
 
@@ -593,6 +821,11 @@ def district_calc(df, ini_date, end_date):
     Output("df-block-kpis", "children"),
     Output("my-map-dd", "options"),
     Output("my-map-dd", "value"),
+    Output("my-trends-dd", "options"),
+    Output("my-trends-dd", "value"),
+    Output("my-districts-dd", "options"),
+    Output("my-districts-dd", "value"),
+    Output("df-trends-kpis", "children"),
     Input("my-date-picker-range", "start_date"),
     Input("my-date-picker-range", "end_date"),
     Input("btn-close", "n_clicks"),
@@ -603,7 +836,7 @@ def update_districts(start_date, end_date, _, vacc_df):
 
     # file not available or inconsistent dates
     if not vacc_df or (start_date > end_date):
-        return "N/A", "N/A", {}, {}, [], ""
+        return "N/A", "N/A", {}, {}, [], "", [], "", [], "", {}
     else:
         return district_calc(vacc_df, start_date, end_date)
 
@@ -663,6 +896,55 @@ def update_map(dd_value, distr_kpi_df):
         return label_no_fig
     else:
         return display_in_map(distr_kpi_df, dd_value)
+
+
+# In[ ]:
+
+
+# use dropdown values to update trendlines (district-wise)
+def display_in_line(trends_df, dd_kpi, dd_distr, freq_val):
+
+    # json to dataframe, query by dropdown values
+    query_by_dd = "District in @dd_distr & variable in @dd_kpi & Freq == @freq_val"
+    distr_trends_df = (
+        pd.read_json(trends_df, orient="split", convert_dates=["Date"],)
+        .query(query_by_dd)
+        .sort_values(["Date", "District", "variable"], ignore_index=True,)
+        .set_index(["District", "variable"])
+    )
+
+    if distr_trends_df.empty:
+        return label_no_fig
+    else:
+        return px.line(
+            distr_trends_df,
+            x="Date",
+            y="value",
+            color=list(distr_trends_df.index),
+            line_shape="spline",
+            render_mode="svg,",
+            hover_data=["value"],
+        ).update_traces(mode="lines+markers")
+
+
+# In[ ]:
+
+
+@app.callback(
+    Output("trends-plot", "figure"),
+    Input("my-trends-dd", "value"),
+    Input("my-districts-dd", "value"),
+    Input("radios", "value"),
+    State("df-trends-kpis", "children"),
+    prevent_initial_call=True,
+)
+def update_trends(dd_kpi, dd_distr, freq_value, distr_trends_df):
+
+    # file not available
+    if not distr_trends_df or not dd_kpi or not dd_distr:
+        return label_no_fig
+    else:
+        return display_in_line(distr_trends_df, dd_kpi, dd_distr, freq_value)
 
 
 # In[ ]:
