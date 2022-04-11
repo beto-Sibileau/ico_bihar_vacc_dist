@@ -10,6 +10,7 @@ import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
 from datetime import date, datetime
 import io
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import requests
@@ -64,6 +65,21 @@ data_2_map_district = {
     "SUPAUL": "Supaul",
     "VAISHALI": "Vaishali",
 }
+
+
+# In[ ]:
+
+
+# geo-json file refactor from google datameet group attach: 7f92b3f234ecf846/india%20subdists%202001.zip
+url_geo_block = "https://raw.githubusercontent.com/beto-Sibileau/ico_bihar_vacc_dist/main/admin_census_bihar_blocks_refactor.json"
+response_geo_block = requests.get(url_geo_block)
+geofile_block = response_geo_block.json()
+
+list_of_dict = [a_dict["properties"] for a_dict in geofile_block["features"]]
+block_names = [a_polyg["NAME1_"] for a_polyg in list_of_dict]
+fids = [a_polyg["FID"] for a_polyg in list_of_dict]
+
+admin_blocks_df = pd.DataFrame({"Fid": fids, "Block_Id": block_names})
 
 
 # In[ ]:
@@ -250,7 +266,7 @@ map_row = dbc.Container(
                     html.Div(
                         [
                             html.P(
-                                "Key Performance Indicators: District-wise map",
+                                "Key Performance Indicators: Bihar Administrative Geolocation",
                                 style={
                                     "fontWeight": "bold",  # 'normal', #
                                     "textAlign": "left",  # 'center', #
@@ -271,7 +287,10 @@ map_row = dbc.Container(
             style={"paddingLeft": "25px", "marginBottom": "30px",},
         ),
         dbc.Row(
-            [dbc.Col(dcc.Graph(id="district-plot", figure=label_no_fig), width=7),],
+            [
+                dbc.Col(dcc.Graph(id="district-plot", figure=label_no_fig), width=5),
+                dbc.Col(dcc.Graph(id="block-plot", figure=label_no_fig), width=5),
+            ],
             justify="evenly",
             align="start",
         ),
@@ -410,23 +429,47 @@ server = app.server
 # app tittle for web browser
 app.title = "UNICEF Bihar Vaccine Distribution"
 
+# title row
+title_row = dbc.Container(
+    dbc.Row(
+        [
+            dbc.Col(
+                html.Img(src="assets/logo-unicef-large.svg"),
+                width=3,
+                # width={"size": 3, "offset": 1},
+                style={"paddingLeft": "20px", "paddingTop": "20px"},
+            ),
+            dbc.Col(
+                html.Div(
+                    [
+                        html.H6(
+                            "ICO Bihar Vaccine Distribution",
+                            style={
+                                "fontWeight": "bold",
+                                "textAlign": "center",
+                                "paddingTop": "25px",
+                                "color": "white",
+                                "fontSize": "32px",
+                            },
+                        ),
+                    ]
+                ),
+                # width='auto',
+                width={"size": "auto", "offset": 1},
+            ),
+        ],
+        justify="start",
+        align="center",
+    ),
+    fluid=True,
+)
+
 # App Layout
 app.layout = html.Div(
     [
         # title Div
         html.Div(
-            [
-                html.H6(
-                    "UNICEF Bihar Vaccine Distribution",
-                    style={
-                        "fontWeight": "bold",
-                        "textAlign": "center",
-                        "paddingTop": "25px",
-                        "color": "white",
-                        "fontSize": "32px",
-                    },
-                ),
-            ],
+            [title_row],
             style={
                 "height": "100px",
                 "width": "100%",
@@ -561,7 +604,7 @@ def read_csv_file(contents, filename, date):
             f"There was an error processing {filename}",
             {},
         )
-        
+
     # simple validation: col_2_check must be in dataframe
     col_2_check = [
         "Date",
@@ -577,9 +620,15 @@ def read_csv_file(contents, filename, date):
     # missing columns
     miss_col = [i for (i, v) in zip(col_2_check, col_check) if not v]
 
-    # return ingestion message and read csv
-    return (
-        (
+    # missing columns result
+    if all(col_check):
+        # create new column for blocks geo-json id
+        # TODO: pass this operation into parser
+        vacc_dist_df["Block_Id"] = vacc_dist_df[["District", "Block"]].agg(
+            " ".join, axis=1
+        )
+        # return ingestion message and csv data
+        return (
             [
                 f"Uploaded File is {filename}",
                 html.Br(),
@@ -588,8 +637,9 @@ def read_csv_file(contents, filename, date):
             # csv to json: sharing data within Dash
             vacc_dist_df.to_json(orient="split"),
         )
-        if all(col_check)
-        else (
+    else:
+        # return ingestion message and no dataframe
+        (
             [
                 f"Uploaded File is {filename}",
                 html.Br(),
@@ -600,7 +650,6 @@ def read_csv_file(contents, filename, date):
             # no dataframe return
             {},
         )
-    )
 
 
 # In[ ]:
@@ -672,7 +721,7 @@ def district_calc(df, ini_date, end_date):
 
     # kpi: District/Blocks sessions and vacc distribution - Count rows in Notes
     top_block_df = (
-        df_in_dates.groupby(["District", "Block"], sort=False)
+        df_in_dates.groupby("Block_Id", sort=False)
         .agg({"Sess_plan": "sum", "Sess_with_vacc": "sum", "Notes": "size"})
         .astype({"Sess_plan": "int64", "Sess_with_vacc": "int64"})
     )
@@ -697,7 +746,7 @@ def district_calc(df, ini_date, end_date):
         )
         top_block_df[off_col] = round(
             df_in_dates[is_present]
-            .groupby(["District", "Block"], sort=False)
+            .groupby("Block_Id", sort=False)
             .agg({"Notes": "size"})
             .Notes
             / top_block_df.Notes
@@ -725,9 +774,25 @@ def district_calc(df, ini_date, end_date):
         "Sess_with_vacc", ascending=False, ignore_index=True, inplace=True,
     )
 
+    # map visualization: not reported blocks
+    not_report_blocks = np.setdiff1d(
+        admin_blocks_df.Block_Id.values,
+        top_block_df.Block_Id.values,
+        assume_unique=True,
+    )
+    # concat not_report_blocks, replace NaNs and cast kpis to integer
+    top_block_df = (
+        pd.concat(
+            [top_block_df, pd.DataFrame({"Block_Id": not_report_blocks})],
+            ignore_index=True,
+        )
+        .fillna(-1)
+        .astype({elem: "int64" for elem in kpi_with_trend_value})
+    )
+
     # kpi: District sessions and vacc distribution - Time-series: df_in_dates refactor
     # drop not relevant columns
-    df_in_dates.drop(columns=["S_Num", "Block", "Notes"], inplace=True)
+    df_in_dates.drop(columns=["S_Num", "Block", "Block_Id", "Notes"], inplace=True)
     # transform presence of officials to numeric
     df_in_dates.replace({"YES": 1, "NO": 0}, inplace=True, regex=False)
 
@@ -786,11 +851,7 @@ def district_calc(df, ini_date, end_date):
             html.Ol(
                 id="top-b-list",
                 children=[
-                    html.Li("-".join([distr, block]))
-                    for distr, block in zip(
-                        top_block_df.District.values[:10],
-                        top_block_df.Block.values[:10],
-                    )
+                    html.Li(block) for block in top_block_df.Block_Id.values[:10]
                 ],
             )
         ],
@@ -849,13 +910,33 @@ def update_cm_fig(cm_fig):
     cm_fig.update_geos(fitbounds="locations", visible=False)
     cm_fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
     return cm_fig
-
+    
+    
+# color names for scale
+color_names = ["DarkRed", "FloralWhite", "Navy"]
+# customed continous scale
+red_y_blue = [[0, color_names[0]], [0.5, color_names[1]], [1, color_names[2]]]
+# customed continous scale: gray NaNs
+color_nan = "gray"
+nan_red_y_blue = [
+    [0, color_nan],
+    [0.001, color_nan],
+    [0.001, color_names[0]],
+    [0.5, color_names[1]],
+    [1, color_names[2]],
+]
 
 # use dropdown value to update indicator plotted in map (district-wise)
-def display_in_map(kpi_df, dd_value):
+def display_in_map(kpi_df, block_kpi_df, dd_value):
 
     # json to dataframe
     kpi_df = pd.read_json(kpi_df, orient="split")
+    block_kpi_df = pd.read_json(block_kpi_df, orient="split")
+
+    # min-max block kpis (filter > 0)
+    kpi_is_pos = block_kpi_df[dd_value] > 0
+    block_kpi_min = block_kpi_df[kpi_is_pos][dd_value].min()
+    block_kpi_max = block_kpi_df[kpi_is_pos][dd_value].max()
 
     # district vaccine distribution map
     cmap_fig = px.choropleth(
@@ -871,13 +952,29 @@ def display_in_map(kpi_df, dd_value):
         featureidkey="properties.dtname",  # 'properties.ST_NM', #
         locations="distr_geo_label",
         color=dd_value,
-        color_continuous_scale="RdBu",
+        # color_continuous_scale="RdBu",
+        color_continuous_scale=red_y_blue,
         # color_discrete_map={'red':'red', 'orange':'orange', 'green':'green'},
         hover_data=[dd_value],
         projection="mercator",
     )
 
-    return update_cm_fig(cmap_fig)
+    # block vaccine distribution map
+    block_cmap_fig = px.choropleth(
+        block_kpi_df[["Block_Id", dd_value]],
+        geojson=geofile_block,
+        featureidkey="properties.NAME1_",  # 'properties.ST_NM', #
+        locations="Block_Id",
+        color=dd_value,
+        # color_continuous_scale = "RdBu",
+        color_continuous_scale=nan_red_y_blue,
+        # color_discrete_map={'red':'red', 'orange':'orange', 'green':'green'},
+        range_color=[block_kpi_min, block_kpi_max],
+        hover_data=[dd_value],
+        projection="mercator",
+    )
+
+    return update_cm_fig(cmap_fig), update_cm_fig(block_cmap_fig)
 
 
 # In[ ]:
@@ -885,17 +982,19 @@ def display_in_map(kpi_df, dd_value):
 
 @app.callback(
     Output("district-plot", "figure"),
+    Output("block-plot", "figure"),
     Input("my-map-dd", "value"),
     State("df-district-kpis", "children"),
+    State("df-block-kpis", "children"),
     prevent_initial_call=True,
 )
-def update_map(dd_value, distr_kpi_df):
+def update_map(dd_value, distr_kpi_df, block_kpi_df):
 
     # file not available or inconsistent dates
-    if not distr_kpi_df or (dd_value == ""):
-        return label_no_fig
+    if (not distr_kpi_df) | (not block_kpi_df) | (dd_value == ""):
+        return label_no_fig, label_no_fig
     else:
-        return display_in_map(distr_kpi_df, dd_value)
+        return display_in_map(distr_kpi_df, block_kpi_df, dd_value)
 
 
 # In[ ]:
